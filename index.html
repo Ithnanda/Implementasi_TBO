@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulasi DFA Ninjutsu</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:           #f5f0e8;
+            --surface:      #ffffff;
+            --surface-alt:  #faf8f4;
+            --border:       #d6cfc4;
+            --border-dark:  #a89880;
+            --ink:          #1a1410;
+            --ink-muted:    #6b5d52;
+            --accent:       #c0392b;
+            --accent-light: #e74c3c;
+            --accent-glow:  rgba(192, 57, 43, 0.15);
+            --success:      #27ae60;
+            --success-glow: rgba(39, 174, 96, 0.15);
+            --fail:         #e74c3c;
+            --shadow:       0 2px 12px rgba(26,20,16,0.08);
+            --shadow-lg:    0 8px 32px rgba(26,20,16,0.14);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Crimson Pro', Georgia, serif;
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(ellipse at 20% 0%, rgba(192,57,43,0.04) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 100%, rgba(192,57,43,0.04) 0%, transparent 60%);
+            color: var(--ink);
+            margin: 0;
+            padding: 24px 16px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* ── PAGE TITLE ── */
+        .page-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            font-weight: 900;
+            letter-spacing: 0.12em;
+            color: var(--accent);
+            text-align: center;
+            margin: 0 0 24px;
+            text-transform: uppercase;
+        }
+        .page-title span {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--ink-muted);
+            letter-spacing: 0.3em;
+            margin-top: 4px;
+        }
+
+        /* ── LAYOUT ── */
+        .container {
+            max-width: 960px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1.15fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+        @media (max-width: 700px) {
+            .container { grid-template-columns: 1fr; }
+        }
+
+        /* ── PANEL BASE ── */
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+        .panel-header {
+            background: var(--surface-alt);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .panel-header h2 {
+            font-family: 'Cinzel', serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--ink);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin: 0;
+        }
+        .panel-header .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+        .panel-body { padding: 20px; }
+
+        /* ── SCREEN ── */
+        .screen {
+            background: var(--surface-alt);
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 18px;
+            min-height: 260px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .screen.state-active  { border-color: var(--accent);  box-shadow: 0 0 0 3px var(--accent-glow); }
+        .screen.state-success { border-color: var(--success); box-shadow: 0 0 0 3px var(--success-glow); }
+        .screen.state-fail    { border-color: var(--fail);    box-shadow: 0 0 0 3px rgba(231,76,60,0.15); }
+
+        /* ── SEAL VISUAL (CSS Sprite) ── */
+        /*
+            Image grid layout (4 cols × 3 rows):
+            Row 0: bird(0,0)  boar(1,0)  dog(2,0)  dragon(3,0)
+            Row 1: hare(0,1)  horse(1,1) monkey(2,1) ox(3,1)
+            Row 2: ram(0,2)   rat(1,2)   serpent(2,2) tiger(3,2)
+
+            bg-position formula: x = col/3*100%, y = row/2*100%
+        */
+        #seal-visual {
+            width: 130px;
+            height: 130px;
+            background-image: url('Hand.jpg');
+            background-size: 400% 300%;   /* 4 cols × 3 rows */
+            background-repeat: no-repeat;
+            border-radius: 10px;
+            border: 2px solid var(--border-dark);
+            box-shadow: var(--shadow);
+            display: none;
+        }
+        /* Row 0 (y = 0%) */
+        .seal-bird    { background-position:   0%   0%; }   /* col0, row0 */
+        .seal-boar    { background-position:  33.33%  0%; } /* col1, row0 */
+        .seal-dog     { background-position:  66.66%  0%; } /* col2, row0 */
+        .seal-dragon  { background-position: 100%   0%; }   /* col3, row0 */
+        /* Row 1 (y = 50%) */
+        .seal-hare    { background-position:   0%  50%; }
+        .seal-horse   { background-position:  33.33% 50%; }
+        .seal-monkey  { background-position:  66.66% 50%; }
+        .seal-ox      { background-position: 100%  50%; }
+        /* Row 2 (y = 100%) */
+        .seal-ram     { background-position:   0% 100%; }
+        .seal-rat     { background-position:  33.33% 100%; }
+        .seal-serpent { background-position:  66.66% 100%; }
+        .seal-tiger   { background-position: 100% 100%; }
+
+        #emoji-placeholder {
+            font-size: 4.5rem;
+            opacity: 0.25;
+            line-height: 1;
+            user-select: none;
+        }
+
+        .seal-name-label {
+            font-family: 'Cinzel', serif;
+            font-size: 0.9rem;
+            letter-spacing: 0.08em;
+            color: var(--ink-muted);
+            text-transform: uppercase;
+            min-height: 1.2em;
+        }
+
+        #sequence-display {
+            font-size: 0.9rem;
+            color: var(--ink-muted);
+            font-style: italic;
+            letter-spacing: 0.03em;
+            min-height: 1.3em;
+            text-align: center;
+            max-width: 100%;
+            word-break: break-word;
+        }
+
+        #status-display {
+            font-family: 'Cinzel', serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--ink);
+            text-align: center;
+            transition: color 0.3s;
+            letter-spacing: 0.05em;
+        }
+        #status-display.status-success { color: var(--success); }
+        #status-display.status-fail    { color: var(--fail); }
+        #status-display.status-active  { color: var(--accent); }
+
+        /* ── SEAL GRID ── */
+        .seal-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .seal-btn {
+            background: var(--surface-alt);
+            color: var(--ink);
+            border: 1.5px solid var(--border);
+            padding: 10px 4px;
+            font-family: 'Cinzel', serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            line-height: 1.2;
+        }
+        .seal-btn:hover:not(:disabled) {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(192,57,43,0.25);
+        }
+        .seal-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+        .seal-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        /* ── RESET BUTTON ── */
+        .reset-btn {
+            width: 100%;
+            background: var(--surface-alt);
+            color: var(--ink-muted);
+            border: 1.5px solid var(--border);
+            padding: 12px;
+            font-family: 'Cinzel', serif;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.18s;
+        }
+        .reset-btn:hover {
+            background: var(--ink);
+            border-color: var(--ink);
+            color: #fff;
+        }
+
+        /* ── GUIDE PANEL ── */
+        .guide-panel {
+            max-height: 82vh;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-dark) transparent;
+        }
+        .guide-panel::-webkit-scrollbar { width: 6px; }
+        .guide-panel::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 3px; }
+
+        .jutsu-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .jutsu-item {
+            background: var(--surface-alt);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            border-left: 3px solid var(--accent);
+        }
+        .jutsu-name {
+            font-family: 'Cinzel', serif;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--ink);
+            margin-bottom: 6px;
+        }
+        .jutsu-combo {
+            font-family: 'Crimson Pro', serif;
+            font-size: 0.88rem;
+            color: var(--ink-muted);
+            line-height: 1.5;
+        }
+        .combo-seal {
+            display: inline-block;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-size: 0.8rem;
+            margin: 1px 2px;
+            color: var(--ink);
+        }
+        .combo-arrow {
+            color: var(--accent);
+            font-size: 0.75rem;
+            margin: 0 1px;
+        }
+
+        /* ── ANIMATIONS ── */
+        .pop-in {
+            animation: popIn 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.4) both;
+        }
+        @keyframes popIn {
+            from { transform: scale(0.75); opacity: 0; }
+            to   { transform: scale(1);    opacity: 1; }
+        }
+        .shake {
+            animation: shake 0.38s ease;
+        }
+        @keyframes shake {
+            0%,100% { transform: translateX(0); }
+            20%      { transform: translateX(-8px); }
+            40%      { transform: translateX(8px); }
+            60%      { transform: translateX(-6px); }
+            80%      { transform: translateX(6px); }
+        }
+        .flash-success {
+            animation: flashSuccess 0.5s ease;
+        }
+        @keyframes flashSuccess {
+            0%,100% { background: var(--surface-alt); }
+            50%     { background: rgba(39,174,96,0.08); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="page-title">
+    Simulasi DFA Ninjutsu
+    <span>Naruto Hand Seal Sequence Automaton</span>
+</div>
+
+<div class="container">
+
+    <!-- ═══ SIMULATOR PANEL ═══ -->
+    <div class="panel">
+        <div class="panel-header">
+            <div class="dot"></div>
+            <h2>Simulator Segel Tangan</h2>
+        </div>
+        <div class="panel-body">
+            <div class="screen" id="main-screen">
+                <div id="emoji-placeholder">🥷</div>
+                <div id="seal-visual"></div>
+                <div class="seal-name-label" id="seal-name-label"></div>
+                <div id="sequence-display">Belum ada segel dipilih</div>
+                <div id="status-display">Siap Membentuk Chakra</div>
+            </div>
+
+            <div class="seal-grid" id="seal-grid"></div>
+
+            <button class="reset-btn" onclick="resetDFA()">↺ &nbsp; Lepas Jutsu &amp; Reset</button>
+        </div>
+    </div>
+
+    <!-- ═══ GUIDE PANEL ═══ -->
+    <div class="panel guide-panel">
+        <div class="panel-header">
+            <div class="dot"></div>
+            <h2>Buku Panduan Jutsu</h2>
+        </div>
+        <div class="panel-body">
+            <ul class="jutsu-list" id="jutsu-list"></ul>
+        </div>
+    </div>
+
+</div><!-- .container -->
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   DATA: 12 Segel sesuai gambar Hand.jpg
+   Grid layout gambar: 4 kolom × 3 baris
+   Row 0: bird | boar  | dog    | dragon
+   Row 1: hare | horse | monkey | ox
+   Row 2: ram  | rat   | serpent| tiger
+═══════════════════════════════════════════════════════════ */
+const SEALS = [
+    { id: "Ne",      label: "Rat\n(Tikus)",     cssClass: "seal-rat"     },
+    { id: "Ushi",    label: "Ox\n(Sapi)",        cssClass: "seal-ox"      },
+    { id: "Tora",    label: "Tiger\n(Harimau)",  cssClass: "seal-tiger"   },
+    { id: "U",       label: "Hare\n(Kelinci)",   cssClass: "seal-hare"    },
+    { id: "Tatsu",   label: "Dragon\n(Naga)",    cssClass: "seal-dragon"  },
+    { id: "Mi",      label: "Serpent\n(Ular)",   cssClass: "seal-serpent" },
+    { id: "Uma",     label: "Horse\n(Kuda)",     cssClass: "seal-horse"   },
+    { id: "Hitsuji", label: "Ram\n(Domba)",      cssClass: "seal-ram"     },
+    { id: "Saru",    label: "Monkey\n(Monyet)",  cssClass: "seal-monkey"  },
+    { id: "Tori",    label: "Bird\n(Ayam)",      cssClass: "seal-bird"    },
+    { id: "Inu",     label: "Dog\n(Anjing)",     cssClass: "seal-dog"     },
+    { id: "I",       label: "Boar\n(Babi)",      cssClass: "seal-boar"    },
+];
+
+/* Alias pendek untuk DFA (pakai id) */
+const [Ne, Ushi, Tora, U, Tatsu, Mi, Uma, Hitsuji, Saru, Tori, Inu, I] =
+    SEALS.map(s => s.id);
+
+/* ── JUTSU DEFINITIONS ── */
+const JUTSU_GUIDE = [
+    { name: "⚡ Chidori",               combo: [Ushi, U, Saru] },
+    { name: "🌩️ Raikiri",               combo: [Ushi, U, Saru, Tatsu] },
+    { name: "🧠 Shintenshin no Jutsu",  combo: [Ushi, Tora, Ne] },
+    { name: "🔥 Katon: Goukakyuu",      combo: [Mi, Hitsuji, Saru, I, Uma, Tora] },
+    { name: "🐸 Kuchiyose no Jutsu",    combo: [I, Inu, Tori, Saru, Hitsuji] },
+    { name: "⚰️ Edo Tensei",            combo: [Tora, Mi, Inu, Tatsu] },
+    { name: "🦈 Suiton: Suikodan",      combo: [Tora, Ushi, Tatsu, U, Inu, Tori] },
+    { name: "🧱 Doton: Doryuheki",      combo: [Tora, U, I, Inu] },
+    { name: "👥 Kage Bunshin",          combo: [Hitsuji, Mi, Tora] },
+    { name: "🌪️ Kamaitachi",            combo: [Tatsu, Tora, U] },
+];
+
+/* ── DFA TRANSITION TABLE ── */
+const DFA = {
+    "q0": {
+        [Ushi]: "q_ushi", [Mi]: "q_mi", [I]: "q_i",
+        [Tora]: "q_tora", [Hitsuji]: "q_htsj", [Tatsu]: "q_tatsu"
+    },
+    // Chidori / Raikiri / Shintenshin branch
+    "q_ushi":           { [U]: "q_ushi_u",   [Tora]: "q_ushi_tora" },
+    "q_ushi_u":         { [Saru]: "JUTSU_CHIDORI" },
+    "JUTSU_CHIDORI":    { [Tatsu]: "JUTSU_RAIKIRI" },
+    "q_ushi_tora":      { [Ne]: "JUTSU_SHINTENSHIN" },
+    // Katon: Goukakyuu branch
+    "q_mi":             { [Hitsuji]: "q_mi_htsj" },
+    "q_mi_htsj":        { [Saru]: "q_mi_htsj_saru" },
+    "q_mi_htsj_saru":   { [I]: "q_mi_htsj_saru_i" },
+    "q_mi_htsj_saru_i": { [Uma]: "q_mi_htsj_saru_i_uma" },
+    "q_mi_htsj_saru_i_uma": { [Tora]: "JUTSU_GOUKAKYUU" },
+    // Kuchiyose branch
+    "q_i":              { [Inu]: "q_i_inu" },
+    "q_i_inu":          { [Tori]: "q_i_inu_tori" },
+    "q_i_inu_tori":     { [Saru]: "q_i_inu_tori_saru" },
+    "q_i_inu_tori_saru":{ [Hitsuji]: "JUTSU_KUCHIYOSE" },
+    // Multi-branch from Tora
+    "q_tora":           { [Mi]: "q_tora_mi", [Ushi]: "q_tora_ushi", [U]: "q_tora_u" },
+    "q_tora_mi":        { [Inu]: "q_tora_mi_inu" },
+    "q_tora_mi_inu":    { [Tatsu]: "JUTSU_EDO_TENSEI" },
+    "q_tora_ushi":      { [Tatsu]: "q_tora_ushi_tatsu" },
+    "q_tora_ushi_tatsu":{ [U]: "q_tora_ushi_tatsu_u" },
+    "q_tora_ushi_tatsu_u": { [Inu]: "q_tora_ushi_tatsu_u_inu" },
+    "q_tora_ushi_tatsu_u_inu": { [Tori]: "JUTSU_SUIKODAN" },
+    "q_tora_u":         { [I]: "q_tora_u_i" },
+    "q_tora_u_i":       { [Inu]: "JUTSU_DORYUHEKI" },
+    // Kage Bunshin branch
+    "q_htsj":           { [Mi]: "q_htsj_mi" },
+    "q_htsj_mi":        { [Tora]: "JUTSU_KAGE_BUNSHIN" },
+    // Kamaitachi branch
+    "q_tatsu":          { [Tora]: "q_tatsu_tora" },
+    "q_tatsu_tora":     { [U]: "JUTSU_KAMAITACHI" },
+};
+
+const JUTSU_NAMES = {
+    "JUTSU_CHIDORI":    "⚡ CHIDORI!",
+    "JUTSU_RAIKIRI":    "🌩️ RAIKIRI!",
+    "JUTSU_SHINTENSHIN":"🧠 SHINTENSHIN!",
+    "JUTSU_GOUKAKYUU":  "🔥 KATON: GOUKAKYUU!",
+    "JUTSU_KUCHIYOSE":  "🐸 KUCHIYOSE NO JUTSU!",
+    "JUTSU_EDO_TENSEI": "⚰️ EDO TENSEI!",
+    "JUTSU_SUIKODAN":   "🦈 SUITON: SUIKODAN!",
+    "JUTSU_DORYUHEKI":  "🧱 DOTON: DORYUHEKI!",
+    "JUTSU_KAGE_BUNSHIN":"👥 KAGE BUNSHIN NO JUTSU!",
+    "JUTSU_KAMAITACHI": "🌪️ KAMAITACHI!",
+};
+
+/* ═══ STATE ═══ */
+let currentState = "q0";
+let sequence = [];
+let currentCssClass = "";
+
+/* ═══ BUILD SEAL BUTTONS ═══ */
+const grid = document.getElementById("seal-grid");
+SEALS.forEach(seal => {
+    const btn = document.createElement("button");
+    btn.className = "seal-btn";
+    btn.textContent = seal.label;
+    btn.style.whiteSpace = "pre-line";
+    btn.dataset.id = seal.id;
+    btn.dataset.css = seal.cssClass;
+    btn.addEventListener("click", () => handleInput(seal.id, seal.label.split("\n")[0], seal.cssClass));
+    grid.appendChild(btn);
+});
+
+/* ═══ BUILD GUIDE LIST ═══ */
+const guideList = document.getElementById("jutsu-list");
+JUTSU_GUIDE.forEach(j => {
+    const li = document.createElement("li");
+    li.className = "jutsu-item";
+    const comboHTML = j.combo.map((id, i) => {
+        const seal = SEALS.find(s => s.id === id);
+        const name = seal ? seal.label.split("\n")[0] : id;
+        return `<span class="combo-seal">${name}</span>${i < j.combo.length - 1 ? '<span class="combo-arrow">→</span>' : ""}`;
+    }).join("");
+    li.innerHTML = `<div class="jutsu-name">${j.name}</div><div class="jutsu-combo">${comboHTML}</div>`;
+    guideList.appendChild(li);
+});
+
+/* ═══ CORE LOGIC ═══ */
+function handleInput(sealId, sealDisplayName, cssClass) {
+    if (currentState === "trap") return;
+
+    sequence.push(sealDisplayName);
+    currentCssClass = cssClass;
+    updateSequenceDisplay();
+    showSealVisual(cssClass, sealDisplayName);
+
+    const screen = document.getElementById("main-screen");
+    const transitions = DFA[currentState];
+
+    if (transitions && transitions[sealId]) {
+        currentState = transitions[sealId];
+
+        if (JUTSU_NAMES[currentState]) {
+            // SUCCESS
+            setStatus(JUTSU_NAMES[currentState], "status-success");
+            screen.className = "screen state-success flash-success";
+            setTimeout(() => screen.classList.remove("flash-success"), 500);
+        } else {
+            // Progressing
+            setStatus("Membentuk Chakra…", "status-active");
+            screen.className = "screen state-active";
+        }
+    } else {
+        // FAIL
+        currentState = "trap";
+        setStatus("❌ GAGAL! Segel Salah!", "status-fail");
+        screen.className = "screen state-fail shake";
+        setTimeout(() => screen.classList.remove("shake"), 400);
+
+        document.getElementById("seal-visual").style.display = "none";
+        document.getElementById("emoji-placeholder").style.display = "block";
+        document.getElementById("emoji-placeholder").textContent = "💨";
+        document.getElementById("seal-name-label").textContent = "";
+
+        setAllButtonsDisabled(true);
+    }
+}
+
+function showSealVisual(cssClass, name) {
+    const emoji = document.getElementById("emoji-placeholder");
+    const visual = document.getElementById("seal-visual");
+    const label = document.getElementById("seal-name-label");
+
+    emoji.style.display = "none";
+    visual.style.display = "block";
+    label.textContent = name;
+
+    visual.className = cssClass + " pop-in";
+    // Re-trigger animation
+    void visual.offsetWidth;
+}
+
+function updateSequenceDisplay() {
+    const el = document.getElementById("sequence-display");
+    el.textContent = sequence.length ? sequence.join(" → ") : "Belum ada segel dipilih";
+}
+
+function setStatus(text, cls) {
+    const el = document.getElementById("status-display");
+    el.textContent = text;
+    el.className = cls;
+}
+
+function setAllButtonsDisabled(disabled) {
+    document.querySelectorAll(".seal-btn").forEach(b => b.disabled = disabled);
+}
+
+function resetDFA() {
+    currentState = "q0";
+    sequence = [];
+    currentCssClass = "";
+    updateSequenceDisplay();
+
+    const emoji = document.getElementById("emoji-placeholder");
+    const visual = document.getElementById("seal-visual");
+    const label = document.getElementById("seal-name-label");
+
+    emoji.style.display = "block";
+    emoji.textContent = "🥷";
+    visual.style.display = "none";
+    visual.className = "";
+    label.textContent = "";
+
+    document.getElementById("main-screen").className = "screen";
+    setStatus("Siap Membentuk Chakra", "");
+    setAllButtonsDisabled(false);
+}
+</script>
+</body>
+</html>
